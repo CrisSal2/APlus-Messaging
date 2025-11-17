@@ -15,23 +15,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'APlus Messaging backend is running' });
 });
 
-/* Example route to check our Supabase connection */
+/* Example route to check our Supabase connection using the boards table */
 app.get('/supabase-check', async (req, res) => {
   try {
-    
-    const { data, error } = await supabase.rpc('now');
+    const { data, error } = await supabase
+      .from('boards')
+      .select('id, name, monday_board_id')
+      .limit(1);
 
     if (error) {
-      console.error(error);
+      console.error('Supabase error:', error);
       return res.status(500).json({ ok: false, error: error.message });
     }
 
-    res.json({ ok: true, server_time: data });
+    res.json({
+      ok: true,
+      sample_board: data && data.length > 0 ? data[0] : null
+    });
   } catch (err) {
-    console.error(err);
+    console.error('Unexpected error:', err);
     res.status(500).json({ ok: false, error: 'Unexpected error' });
   }
 });
+
 
 // Start server
 const PORT = process.env.PORT || 4000;
