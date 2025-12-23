@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import { supabase } from './supabaseClient.js';
+import authRoutes from './authRoutes.js';
+import { authRequired } from './middleware/auth.js';
+import { boardAccessRequired } from "./middleware/boardAccess.js";
 
 
 const app = express();
@@ -9,6 +12,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/auth', authRoutes);
+
 
 /* Health check route */
 app.get('/health', (req, res) => {
@@ -39,88 +44,68 @@ app.get('/supabase-check', async (req, res) => {
 });
 
 /* Create a new message */
-app.post('/api/messages', async (req, res) => {
+app.post("/api/messages", authRequired, boardAccessRequired, async (req, res) => {
   try {
-    const { boardId, senderId, content } = req.body;
+    const { boardId, content } = req.body;
 
-    if (!boardId || !senderId || !content) {
+    // Important: senderId must come from JWT, NOT from req.body
+    const senderId = req.user.id;
+
+    if (!boardId || !content) {
       return res.status(400).json({
         ok: false,
-        error: 'boardId, senderId, and content are required'
+        error: "boardId and content are required",
       });
     }
 
     const { data, error } = await supabase
-      .from('messages')
+      .from("messages")
       .insert([
         {
           board_id: boardId,
           sender_id: senderId,
-          content
-        }
+          content,
+        },
       ])
-      .select('*')
+      .select("*")
       .single();
 
     if (error) {
-      console.error('Error inserting message:', error);
-      return res.status(500).json({
-        ok: false,
-        error: error.message
-      });
+      console.error("Error inserting message:", error);
+      return res.status(500).json({ ok: false, error: error.message });
     }
 
-    return res.status(201).json({
-      ok: true,
-      message: data
-    });
+    return res.status(201).json({ ok: true, message: data });
   } catch (err) {
-    console.error('Unexpected error in POST /api/messages:', err);
-    return res.status(500).json({
-      ok: false,
-      error: 'Unexpected server error'
-    });
+    console.error("Unexpected error in POST /api/messages:", err);
+    return res.status(500).json({ ok: false, error: "Unexpected server error" });
   }
 });
 
+
 /* Get all messages for a specific board */
-app.get('/api/messages/:boardId', async (req, res) => {
+app.get("/api/messages/:boardId", authRequired, boardAccessRequired, async (req, res) => {
   try {
     const { boardId } = req.params;
 
-    if (!boardId) {
-      return res.status(400).json({
-        ok: false,
-        error: 'boardId is required in the URL'
-      });
-    }
-
     const { data, error } = await supabase
-      .from('messages')
-      .select('id, board_id, sender_id, content, created_at')
-      .eq('board_id', boardId)
-      .order('created_at', { ascending: true });
+      .from("messages")
+      .select("id, board_id, sender_id, content, created_at")
+      .eq("board_id", boardId)
+      .order("created_at", { ascending: true });
 
     if (error) {
-      console.error('Error fetching messages:', error);
-      return res.status(500).json({
-        ok: false,
-        error: error.message
-      });
+      console.error("Error fetching messages:", error);
+      return res.status(500).json({ ok: false, error: error.message });
     }
 
-    return res.json({
-      ok: true,
-      messages: data || []
-    });
+    return res.json({ ok: true, messages: data || [] });
   } catch (err) {
-    console.error('Unexpected error in GET /api/messages/:boardId:', err);
-    return res.status(500).json({
-      ok: false,
-      error: 'Unexpected server error'
-    });
+    console.error("Unexpected error in GET /api/messages/:boardId:", err);
+    return res.status(500).json({ ok: false, error: "Unexpected server error" });
   }
 });
+
 
 
 
