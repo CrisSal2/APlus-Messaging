@@ -6,6 +6,9 @@ import { supabase } from './supabaseClient.js';
 import authRoutes from './authRoutes.js';
 import { authRequired } from './middleware/auth.js';
 import { boardAccessRequired } from './middleware/boardAccess.js';
+import inviteRoutes from './inviteRoutes.js';
+import boardRoutes from './boardRoutes.js';
+
 
 const app = express();
 
@@ -18,6 +21,9 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/auth', authRoutes);
+app.use('/api/invites', inviteRoutes);
+app.use('/api/boards', boardRoutes);
+
 
 /* Health check route */
 app.get('/health', (req, res) => {

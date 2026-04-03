@@ -1,0 +1,281 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  background: #f6f7fb;
+  color: #323338;
+}
+
+/* Loading / error screens */
+.state-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 12px;
+  color: #676879;
+}
+
+.error-text {
+  color: #d83a52;
+  font-weight: 500;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e6e9ef;
+  border-top-color: #0073ea;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Chat window */
+.chat-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #fff;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  border-bottom: 2px solid #e6e9ef;
+  background: #fff;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #676879;
+  transition: color 0.15s;
+}
+
+.tab.active {
+  color: #0073ea;
+  border-bottom: 2px solid #0073ea;
+  margin-bottom: -2px;
+}
+
+.tab:hover:not(.active) {
+  color: #323338;
+}
+
+/* Message list */
+.message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #676879;
+  margin-top: 32px;
+}
+
+.message {
+  max-width: 72%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.message.mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.message.theirs {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.message-content {
+  padding: 8px 12px;
+  border-radius: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.mine .message-content {
+  background: #0073ea;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.theirs .message-content {
+  background: #f6f7fb;
+  color: #323338;
+  border-bottom-left-radius: 4px;
+}
+
+.message-time {
+  font-size: 11px;
+  color: #afb0bd;
+  padding: 0 4px;
+}
+
+/* Input area */
+.input-area {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #e6e9ef;
+  background: #fff;
+}
+
+.input-area textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid #c3c6d4;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-area textarea:focus {
+  border-color: #0073ea;
+}
+
+.input-area button {
+  padding: 8px 16px;
+  background: #0073ea;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: flex-end;
+}
+
+.input-area button:hover:not(:disabled) {
+  background: #0060c0;
+}
+
+.input-area button:disabled {
+  background: #c3c6d4;
+  cursor: not-allowed;
+}
+
+/* Clients tab */
+.invite-panel {
+  padding: 16px;
+  border-bottom: 1px solid #e6e9ef;
+}
+
+.invite-panel h4,
+.client-list h4 {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #676879;
+}
+
+.invite-row {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-row input {
+  flex: 1;
+  border: 1px solid #c3c6d4;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+.invite-row input:focus {
+  border-color: #0073ea;
+}
+
+.invite-row button {
+  padding: 7px 14px;
+  background: #0073ea;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.invite-row button:disabled {
+  background: #c3c6d4;
+  cursor: not-allowed;
+}
+
+.invite-status {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.invite-status.success { color: #00854d; }
+.invite-status.error   { color: #d83a52; }
+
+/* Client list */
+.client-list {
+  padding: 16px;
+}
+
+.client-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f6f7fb;
+}
+
+.client-email {
+  font-size: 14px;
+  color: #323338;
+}
+
+.revoke-btn {
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid #d83a52;
+  color: #d83a52;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.revoke-btn:hover:not(:disabled) {
+  background: #d83a52;
+  color: #fff;
+}
+
+.revoke-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
