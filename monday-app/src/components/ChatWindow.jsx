@@ -4,17 +4,24 @@ import InvitePanel from './InvitePanel';
 import ClientList from './ClientList';
 
 const POLL_INTERVAL_MS = 3000;
+const TABS = { CHAT: 'chat', CLIENTS: 'clients' };
 
 export default function ChatWindow({ boardId, apiToken, userId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'clients'
+  const [activeTab, setActiveTab] = useState(TABS.CHAT);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
 
   const fetchMessages = async () => {
-    const data = await getMessages(boardId, apiToken);
-    if (data.ok) setMessages(data.messages);
+    try {
+      const data = await getMessages(boardId, apiToken);
+      setMessages((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(data.messages) ? data.messages : prev
+      );
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    }
   };
 
   // Initial load + polling
@@ -50,20 +57,20 @@ export default function ChatWindow({ boardId, apiToken, userId }) {
     <div className="chat-window">
       <div className="tab-bar">
         <button
-          className={`tab ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveTab('chat')}
+          className={`tab ${activeTab === TABS.CHAT ? 'active' : ''}`}
+          onClick={() => setActiveTab(TABS.CHAT)}
         >
           Messages
         </button>
         <button
-          className={`tab ${activeTab === 'clients' ? 'active' : ''}`}
-          onClick={() => setActiveTab('clients')}
+          className={`tab ${activeTab === TABS.CLIENTS ? 'active' : ''}`}
+          onClick={() => setActiveTab(TABS.CLIENTS)}
         >
           Clients
         </button>
       </div>
 
-      {activeTab === 'chat' && (
+      {activeTab === TABS.CHAT && (
         <>
           <div className="message-list">
             {messages.length === 0 && (
@@ -102,7 +109,7 @@ export default function ChatWindow({ boardId, apiToken, userId }) {
         </>
       )}
 
-      {activeTab === 'clients' && (
+      {activeTab === TABS.CLIENTS && (
         <>
           <InvitePanel boardId={boardId} apiToken={apiToken} />
           <ClientList boardId={boardId} apiToken={apiToken} />

@@ -14,12 +14,12 @@ export default function App() {
   // Step 1: Authenticate with our backend using the Monday session token
   useEffect(() => {
     monday.get('sessionToken').then(async (res) => {
-      const data = await mondayAuth(res.data);
-      if (data.ok) {
+      try {
+        const data = await mondayAuth(res.data);
         setApiToken(data.token);
         setUserId(data.user.id);
-      } else {
-        setError(data.error || 'Authentication failed.');
+      } catch (err) {
+        setError(err.message || 'Authentication failed.');
       }
     }).catch(() => setError('Could not reach the authentication server.'));
   }, []);
@@ -29,7 +29,7 @@ export default function App() {
   useEffect(() => {
     if (!apiToken) return;
 
-    monday.listen('context', async (res) => {
+    const unsubscribe = monday.listen('context', async (res) => {
       const mondayBoardId = res.data?.boardId;
       if (!mondayBoardId) return;
 
@@ -42,13 +42,15 @@ export default function App() {
         // non-fatal — we'll fall back to the default name
       }
 
-      const data = await syncBoard(String(mondayBoardId), boardName, apiToken);
-      if (data.ok) {
+      try {
+        const data = await syncBoard(String(mondayBoardId), boardName, apiToken);
         setBoardId(data.board.id);
-      } else {
-        setError(data.error || 'Failed to load board.');
+      } catch (err) {
+        setError(err.message || 'Failed to load board.');
       }
     });
+
+    return () => unsubscribe?.();
   }, [apiToken]);
 
   if (error) {

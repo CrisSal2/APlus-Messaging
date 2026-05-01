@@ -2,6 +2,7 @@
 import express from 'express';
 import { supabase } from './supabaseClient.js';
 import { authRequired } from './middleware/auth.js';
+import { USER_ROLES, BOARD_ROLES } from './constants/roles.js';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ const router = express.Router();
 // -----------------------------
 router.post('/sync', authRequired, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== USER_ROLES.ADMIN) {
       return res.status(403).json({ ok: false, error: 'Admins only.' });
     }
 
@@ -44,7 +45,7 @@ router.post('/sync', authRequired, async (req, res) => {
     const { error: participantError } = await supabase
       .from('board_participants')
       .upsert(
-        [{ board_id: board.id, user_id: req.user.id, role_in_board: 'coordinator' }],
+        [{ board_id: board.id, user_id: req.user.id, role_in_board: BOARD_ROLES.COORDINATOR }],
         { onConflict: 'board_id,user_id' }
       );
 
@@ -64,7 +65,7 @@ router.post('/sync', authRequired, async (req, res) => {
 // -----------------------------
 router.get('/', authRequired, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== USER_ROLES.ADMIN) {
       return res.status(403).json({ ok: false, error: 'Admins only.' });
     }
 
@@ -72,7 +73,7 @@ router.get('/', authRequired, async (req, res) => {
       .from('board_participants')
       .select('boards(id, name, monday_board_id)')
       .eq('user_id', req.user.id)
-      .eq('role_in_board', 'coordinator');
+      .eq('role_in_board', BOARD_ROLES.COORDINATOR);
 
     if (error) {
       return res.status(500).json({ ok: false, error: error.message });
@@ -90,7 +91,7 @@ router.get('/', authRequired, async (req, res) => {
 // -----------------------------
 router.get('/:boardId/participants', authRequired, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== USER_ROLES.ADMIN) {
       return res.status(403).json({ ok: false, error: 'Admins only.' });
     }
 
@@ -100,7 +101,7 @@ router.get('/:boardId/participants', authRequired, async (req, res) => {
       .from('board_participants')
       .select('user_id, role_in_board, users(id, email)')
       .eq('board_id', boardId)
-      .eq('role_in_board', 'client');
+      .eq('role_in_board', BOARD_ROLES.CLIENT);
 
     if (error) {
       return res.status(500).json({ ok: false, error: error.message });
@@ -120,7 +121,7 @@ router.get('/:boardId/participants', authRequired, async (req, res) => {
 // -----------------------------
 router.delete('/:boardId/participants/:userId', authRequired, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== USER_ROLES.ADMIN) {
       return res.status(403).json({ ok: false, error: 'Admins only.' });
     }
 
@@ -131,7 +132,7 @@ router.delete('/:boardId/participants/:userId', authRequired, async (req, res) =
       .delete()
       .eq('board_id', boardId)
       .eq('user_id', userId)
-      .eq('role_in_board', 'client'); // safety: never removes coordinators
+      .eq('role_in_board', BOARD_ROLES.CLIENT); // safety: never removes coordinators
 
     if (error) {
       return res.status(500).json({ ok: false, error: error.message });

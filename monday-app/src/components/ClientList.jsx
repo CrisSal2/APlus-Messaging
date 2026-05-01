@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { getParticipants, revokeAccess } from '../api';
+import { useAsync } from '../hooks/useAsync';
 
 export default function ClientList({ boardId, apiToken }) {
   const [participants, setParticipants] = useState([]);
-  const [revoking, setRevoking] = useState(null); // userId being revoked
-
-  const fetchParticipants = async () => {
-    const data = await getParticipants(boardId, apiToken);
-    if (data.ok) setParticipants(data.participants);
-  };
+  const { execute: fetchClients, loading: fetching } = useAsync(() => getParticipants(boardId, apiToken));
+  const { execute: revoke, loading: revoking } = useAsync((userId) => revokeAccess(boardId, userId, apiToken));
+  const [revokingId, setRevokingId] = useState(null);
 
   useEffect(() => {
-    fetchParticipants();
+    fetchClients().then((data) => setParticipants(data.participants || []));
   }, [boardId]);
 
   const handleRevoke = async (userId, email) => {
@@ -20,10 +18,13 @@ export default function ClientList({ boardId, apiToken }) {
     );
     if (!confirmed) return;
 
-    setRevoking(userId);
-    await revokeAccess(boardId, userId, apiToken);
-    await fetchParticipants();
-    setRevoking(null);
+    setRevokingId(userId);
+    try {
+      await revoke(userId);
+      setParticipants((prev) => prev.filter((p) => p.user_id !== userId));
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   if (participants.length === 0) {
@@ -39,9 +40,9 @@ export default function ClientList({ boardId, apiToken }) {
           <button
             className="revoke-btn"
             onClick={() => handleRevoke(p.user_id, p.users?.email)}
-            disabled={revoking === p.user_id}
+            disabled={revoking || revokingId === p.user_id}
           >
-            {revoking === p.user_id ? 'Removing…' : 'End Access'}
+            {revokingId === p.user_id ? 'Removing…' : 'End Access'}
           </button>
         </div>
       ))}

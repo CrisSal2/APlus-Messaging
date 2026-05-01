@@ -1,28 +1,24 @@
 import { useState } from 'react';
 import { createInvite } from '../api';
+import { useAsync } from '../hooks/useAsync';
 
 export default function InvitePanel({ boardId, apiToken }) {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState(null); // { type: 'success'|'error', message }
-  const [loading, setLoading] = useState(false);
+  const { execute: invite, loading } = useAsync((email) => createInvite(email, boardId, apiToken));
+  const [status, setStatus] = useState(null);
 
   const handleInvite = async () => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || loading) return;
 
-    setLoading(true);
     setStatus(null);
-
-    const data = await createInvite(trimmed, boardId, apiToken);
-
-    if (data.ok) {
+    try {
+      await invite(trimmed);
       setStatus({ type: 'success', message: `Invite sent to ${trimmed}` });
       setEmail('');
-    } else {
-      setStatus({ type: 'error', message: data.error || 'Failed to send invite.' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
     }
-
-    setLoading(false);
   };
 
   return (

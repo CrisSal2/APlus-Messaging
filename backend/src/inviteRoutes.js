@@ -3,6 +3,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { supabase } from './supabaseClient.js';
 import { authRequired } from './middleware/auth.js';
+import { USER_ROLES } from './constants/roles.js';
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ const router = express.Router();
 router.post('/', authRequired, async (req, res) => {
   try {
     // Only admins can create invites
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== USER_ROLES.ADMIN) {
       return res.status(403).json({ ok: false, error: 'Admins only' });
     }
 

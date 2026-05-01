@@ -3,6 +3,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from './supabaseClient.js';
+import { USER_ROLES, BOARD_ROLES } from './constants/roles.js';
 
 const router = express.Router();
 
@@ -72,7 +73,7 @@ router.post('/signup', async (req, res) => {
     // Check if user already exists
     const existing = await supabase
       .from('users')
-      .select('*')
+      .select('id')
       .eq('email', email)
       .maybeSingle();
 
@@ -86,7 +87,7 @@ router.post('/signup', async (req, res) => {
     // Create user
     const { data: user, error: userError } = await supabase
       .from('users')
-      .insert([{ email, password_hash, role: 'client' }])
+      .insert([{ email, password_hash, role: USER_ROLES.CLIENT }])
       .select('*')
       .single();
 
@@ -95,27 +96,27 @@ router.post('/signup', async (req, res) => {
       return res.status(500).json({ ok: false, error: userError.message });
     }
 
-    // Link user to board as client
-    const { error: linkError } = await supabase
-      .from('board_participants')
-      .insert([
-        {
-          board_id: invite.board_id,
-          user_id: user.id,
-          role_in_board: 'client'
-        }
-      ]);
+    // Link user to board and mark invite as used in parallel (independent operations)
+    const [{ error: linkError }, { error: usedError }] = await Promise.all([
+      supabase
+        .from('board_participants')
+        .insert([
+          {
+            board_id: invite.board_id,
+            user_id: user.id,
+            role_in_board: BOARD_ROLES.CLIENT
+          }
+        ]),
+      supabase
+        .from('invites')
+        .update({ used_at: new Date().toISOString() })
+        .eq('id', invite.id)
+    ]);
 
     if (linkError) {
       console.error(linkError);
       return res.status(500).json({ ok: false, error: linkError.message });
     }
-
-    // Mark invite as used
-    const { error: usedError } = await supabase
-      .from('invites')
-      .update({ used_at: new Date().toISOString() })
-      .eq('id', invite.id);
 
     if (usedError) {
       console.error(usedError);
@@ -152,7 +153,7 @@ router.post('/login', async (req, res) => {
       .from('users')
       .select('*')
       .eq('email', email)
-      .eq('role', 'client')
+      .eq('role', USER_ROLES.CLIENT)
       .maybeSingle();
 
     if (error || !user) {
@@ -226,7 +227,7 @@ router.post('/monday', async (req, res) => {
     if (!user) {
       const { data: newUser, error: createError } = await supabase
         .from('users')
-        .insert([{ monday_user_id: mondayUserId, monday_account_id: mondayAccountId, role: 'admin' }])
+        .insert([{ monday_user_id: mondayUserId, monday_account_id: mondayAccountId, role: USER_ROLES.ADMIN }])
         .select('id, email, role')
         .single();
 
