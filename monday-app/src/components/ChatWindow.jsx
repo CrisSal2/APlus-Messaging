@@ -6,30 +6,72 @@ import ClientList from './ClientList';
 const POLL_INTERVAL_MS = 3000;
 const TABS = { CHAT: 'chat', CLIENTS: 'clients' };
 
+// Append messages we haven't seen yet (matched by id)
+function mergeMessages(prev, incoming) {
+  if (!incoming.length) return prev;
+  const seen = new Set(prev.map((m) => m.id));
+  const fresh = incoming.filter((m) => !seen.has(m.id));
+  return fresh.length ? [...prev, ...fresh] : prev;
+}
+
 export default function ChatWindow({ boardId, apiToken, userId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState(TABS.CHAT);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const bottomRef = useRef(null);
+  const lastSeenRef = useRef(null); // created_at of the newest message we hold
 
-  const fetchMessages = async () => {
-    try {
-      const data = await getMessages(boardId, apiToken);
-      setMessages((prev) =>
-        JSON.stringify(prev) !== JSON.stringify(data.messages) ? data.messages : prev
-      );
-    } catch (err) {
-      console.error('Failed to fetch messages:', err);
-    }
-  };
-
-  // Initial load + polling
+  // Reset when switching boards
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    setMessages([]);
+    setLoadError(null);
+    lastSeenRef.current = null;
   }, [boardId]);
+
+  // Initial load + incremental polling (only while the chat tab is visible)
+  useEffect(() => {
+    if (activeTab !== TABS.CHAT) return;
+
+    let cancelled = false;
+    let inFlight = false;
+    let interval = null;
+
+    const poll = async () => {
+      if (inFlight || cancelled) return;
+      inFlight = true;
+      try {
+        const data = await getMessages(boardId, apiToken, lastSeenRef.current);
+        if (cancelled) return;
+        setLoadError(null);
+        if (data.messages.length) {
+          lastSeenRef.current = data.messages[data.messages.length - 1].created_at;
+          setMessages((prev) => mergeMessages(prev, data.messages));
+        }
+      } catch (err) {
+        if (cancelled) return;
+        if (err.status === 403) {
+          // Access was removed: stop hammering the API
+          setLoadError('Your access to this board has been removed.');
+          cancelled = true;
+          clearInterval(interval);
+        } else if (err.status !== 401) {
+          setLoadError(err.message);
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    poll();
+    interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [boardId, apiToken, activeTab]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -40,10 +82,18 @@ export default function ChatWindow({ boardId, apiToken, userId }) {
     const trimmed = input.trim();
     if (!trimmed || sending) return;
     setSending(true);
-    await sendMessage(boardId, trimmed, apiToken);
-    setInput('');
-    await fetchMessages();
-    setSending(false);
+    setSendError(null);
+    try {
+      const data = await sendMessage(boardId, trimmed, apiToken);
+      setInput('');
+      lastSeenRef.current = data.message.created_at;
+      setMessages((prev) => mergeMessages(prev, [data.message]));
+    } catch (err) {
+      // keep the text so the user can retry
+      setSendError(err.message || 'Failed to send message.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -73,7 +123,8 @@ export default function ChatWindow({ boardId, apiToken, userId }) {
       {activeTab === TABS.CHAT && (
         <>
           <div className="message-list">
-            {messages.length === 0 && (
+            {loadError && <p className="error-text">{loadError}</p>}
+            {messages.length === 0 && !loadError && (
               <p className="empty-state">No messages yet. Start the conversation.</p>
             )}
             {messages.map((msg) => (
@@ -93,6 +144,7 @@ export default function ChatWindow({ boardId, apiToken, userId }) {
             <div ref={bottomRef} />
           </div>
 
+          {sendError && <p className="error-text">{sendError}</p>}
           <div className="input-area">
             <textarea
               value={input}
@@ -100,6 +152,7 @@ export default function ChatWindow({ boardId, apiToken, userId }) {
               onKeyDown={handleKeyDown}
               placeholder="Type a message… (Enter to send)"
               rows={2}
+              maxLength={4000}
               disabled={sending}
             />
             <button onClick={handleSend} disabled={sending || !input.trim()}>

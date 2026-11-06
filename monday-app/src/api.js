@@ -1,21 +1,50 @@
-const BASE = import.meta.env.VITE_API_URL;
+const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+// Called when an authenticated request gets a 401 (expired/invalid token) so
+// the app can re-authenticate. Set via setUnauthorizedHandler.
+let unauthorizedHandler = null;
+export function setUnauthorizedHandler(fn) {
+  unauthorizedHandler = fn;
+}
 
 /**
- * Standardized API call wrapper that handles errors and Bearer token injection
+ * Standardized API call wrapper: Bearer token injection and consistent errors.
+ * Thrown errors carry `.status` (HTTP status, if any).
  */
 async function apiCall(method, path, token = null, body = null) {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    ...(body && { body: JSON.stringify(body) }),
-  });
+  if (!BASE) {
+    throw new Error('VITE_API_URL is not configured.');
+  }
 
-  const data = await res.json();
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      ...(body && { body: JSON.stringify(body) }),
+    });
+  } catch {
+    throw new Error('Network error. Check your connection and try again.');
+  }
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    // non-JSON body (e.g. a proxy error page)
+  }
+
   if (!res.ok) {
-    throw new Error(data.error || `HTTP ${res.status}`);
+    if (res.status === 401 && token) unauthorizedHandler?.();
+    const err = new Error(data?.error || `Request failed (HTTP ${res.status}).`);
+    err.status = res.status;
+    throw err;
+  }
+  if (data === null) {
+    throw new Error('Unexpected response from the server.');
   }
   return data;
 }
@@ -30,9 +59,10 @@ export async function syncBoard(mondayBoardId, name, token) {
   return apiCall('POST', '/api/boards/sync', token, { mondayBoardId, name });
 }
 
-// Fetch all messages for a board
-export async function getMessages(boardId, token) {
-  return apiCall('GET', `/api/messages/${boardId}`, token);
+// Fetch messages for a board. With `after` (ISO timestamp), only newer ones.
+export async function getMessages(boardId, token, after = null) {
+  const qs = after ? `?after=${encodeURIComponent(after)}` : '';
+  return apiCall('GET', `/api/messages/${boardId}${qs}`, token);
 }
 
 // Send a message to a board

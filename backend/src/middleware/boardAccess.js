@@ -1,59 +1,50 @@
 // src/middleware/boardAccess.js
-import { supabase } from "../supabaseClient.js";
+import { supabase } from '../supabaseClient.js';
+import { BOARD_ROLES } from '../constants/roles.js';
+import { isUuid } from '../utils/validate.js';
 
 /**
- * Ensures the logged-in user is a participant of the board.
- * Looks for boardId in:
- *  - req.params.boardId (GET /api/messages/:boardId)
- *  - req.body.boardId   (POST /api/messages)
+ * Builds a middleware that checks the logged-in user's membership of a board.
+ * boardId is read from req.params.boardId or req.body.boardId.
+ * `allowedRoles` (optional) restricts to specific role_in_board values.
+ * Errors thrown here are forwarded to the global handler (Express 5).
  */
-export async function boardAccessRequired(req, res, next) {
-  try {
-    const boardId = req.params.boardId || req.body.boardId;
+function requireBoardRole(allowedRoles = null) {
+  return async (req, res, next) => {
+    const boardId = req.params.boardId ?? req.body?.boardId;
 
-    if (!boardId) {
-      return res.status(400).json({
-        ok: false,
-        error: "boardId is required.",
-      });
+    if (!isUuid(boardId)) {
+      return res.status(400).json({ ok: false, error: 'A valid boardId is required.' });
     }
 
-    // req.user was attached by authRequired()
     const userId = req.user?.id;
-
     if (!userId) {
-      return res.status(401).json({
-        ok: false,
-        error: "Not authenticated.",
-      });
+      return res.status(401).json({ ok: false, error: 'Not authenticated.' });
     }
 
-    // Check membership in board_participants
     const { data, error } = await supabase
-      .from("board_participants")
-      .select("id, role_in_board")
-      .eq("board_id", boardId)
-      .eq("user_id", userId)
+      .from('board_participants')
+      .select('id, role_in_board')
+      .eq('board_id', boardId)
+      .eq('user_id', userId)
       .maybeSingle();
 
-    if (error) {
-      console.error("boardAccessRequired error:", error);
-      return res.status(500).json({ ok: false, error: error.message });
-    }
+    if (error) throw error;
 
-    if (!data) {
+    if (!data || (allowedRoles && !allowedRoles.includes(data.role_in_board))) {
       return res.status(403).json({
         ok: false,
-        error: "Forbidden: you do not have access to this board.",
+        error: 'Forbidden: you do not have access to this board.',
       });
     }
 
-    // store role for later if useful
     req.boardRole = data.role_in_board;
-
     return next();
-  } catch (err) {
-    console.error("Unexpected boardAccessRequired error:", err);
-    return res.status(500).json({ ok: false, error: "Unexpected server error." });
-  }
+  };
 }
+
+/** Any participant (client or coordinator). */
+export const boardAccessRequired = requireBoardRole();
+
+/** Coordinators only: required for every board-scoped admin action. */
+export const coordinatorRequired = requireBoardRole([BOARD_ROLES.COORDINATOR]);
